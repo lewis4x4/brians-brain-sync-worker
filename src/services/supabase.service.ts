@@ -91,18 +91,43 @@ class SupabaseService {
   }
 
   async upsertEvent(event: any) {
-    const { data, error } = await supabase
+    // First, try to find existing event by external_id
+    const { data: existing } = await supabase
       .from('events')
-      .upsert(event, { onConflict: 'external_id' })
       .select('id')
-      .single();
+      .eq('external_id', event.external_id)
+      .maybeSingle();
     
-    if (error) {
-      console.error('Error upserting event:', error);
-      throw error;
+    if (existing) {
+      // Update existing event
+      const { data, error } = await supabase
+        .from('events')
+        .update(event)
+        .eq('id', existing.id)
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Error updating event:', error);
+        throw error;
+      }
+      
+      return data.id;
+    } else {
+      // Insert new event
+      const { data, error } = await supabase
+        .from('events')
+        .insert(event)
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Error inserting event:', error);
+        throw error;
+      }
+      
+      return data.id;
     }
-    
-    return data.id;
   }
 
   async checkAttachmentExists(eventId: string, filename: string): Promise<boolean> {
