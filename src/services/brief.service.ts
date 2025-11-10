@@ -338,12 +338,17 @@ Use a professional but friendly tone. Be specific and actionable.`
     </div>
 `;
 
-    // Emails
+// Emails
     if (content.emails.length > 0) {
       html += '<h2>📧 Recent Emails</h2>';
       content.emails.forEach(email => {
         const importance = email.importance || 0;
         const projects = email.projects || [];
+        
+        let projectsHtml = '';
+        if (projects.length > 0) {
+          projectsHtml = projects.map((p: string) => '<span class="projects">' + this.escapeHtml(p) + '</span>').join('');
+        }
         
         html += `
         <div class="event email-event">
@@ -351,8 +356,8 @@ Use a professional but friendly tone. Be specific and actionable.`
           <div class="meta">
             From: ${this.escapeHtml(email.metadata?.from || 'Unknown')} | 
             ${new Date(email.created_at_ts).toLocaleString()}
-            ${importance > 0 ? `<span class="importance importance-${importance}">Priority ${importance}</span>` : ''}
-            ${projects.length > 0 ? projects.map((p: string) => `<span class="projects">${this.escapeHtml(p)}</span>`).join('') : ''}
+            ${importance > 0 ? '<span class="importance importance-' + importance + '">Priority ' + importance + '</span>' : ''}
+            ${projectsHtml}
           </div>
           <div class="snippet">${this.truncate(this.escapeHtml(email.body_text), 150)}</div>
         </div>`;
