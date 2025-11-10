@@ -1,4 +1,4 @@
-import { SupabaseService } from './supabase.service';
+import { createClient } from '@supabase/supabase-js';
 import logger from '../utils/logger';
 import crypto from 'crypto';
 
@@ -9,12 +9,9 @@ interface Tokens {
 }
 
 export class TokenService {
-  private supabaseService: SupabaseService;
   private encryptionKey: Buffer;
 
   constructor() {
-    this.supabaseService = new SupabaseService();
-    
     // Derive encryption key from service role key (same as verify-tokens.js)
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     this.encryptionKey = crypto
@@ -24,7 +21,20 @@ export class TokenService {
   }
 
   async getTokens(connectionId: string): Promise<Tokens> {
-    const connection = await this.supabaseService.getConnection(connectionId);
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: connection, error } = await supabase
+      .from('integration_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .single();
+
+    if (error || !connection) {
+      throw new Error('Connection not found');
+    }
     
     // Try to parse tokens from secret_ref (JSON string)
     if (connection.secret_ref && typeof connection.secret_ref === 'string') {
@@ -70,7 +80,12 @@ export class TokenService {
       expires_at: tokens.expiresAt,
     };
 
-    const { error } = await this.supabaseService.supabase
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error } = await supabase
       .from('integration_connections')
       .update({
         secret_ref: JSON.stringify(tokenData),
@@ -122,7 +137,11 @@ export class TokenService {
       throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in: number;
+    };
 
     const newTokens: Tokens = {
       accessToken: data.access_token,

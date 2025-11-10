@@ -70,7 +70,7 @@ export class MicrosoftService {
     }
   }
 
-  async fetchAttachments(messageId: string, accessToken: string): Promise<any[]> {
+   async fetchAttachments(messageId: string, accessToken: string): Promise<any[]> {
     const url = `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments`;
     
     const response = await fetch(url, {
@@ -84,7 +84,7 @@ export class MicrosoftService {
       throw new Error(`Failed to fetch attachments: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { value?: any[] };
     return data.value || [];
   }
 
