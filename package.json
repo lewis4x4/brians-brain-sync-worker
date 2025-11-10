@@ -1,0 +1,30 @@
+{
+  "name": "brian-ai-brain-sync-worker",
+  "version": "1.0.0",
+  "description": "Sync worker for Brian's AI Brain - Microsoft 365 integration",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@supabase/storage-js": "^2.80.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "isomorphic-fetch": "^3.0.0",
+    "mammoth": "^1.11.0",
+    "node-cron": "^3.0.3",
+    "pdf-parse": "^2.4.5",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
