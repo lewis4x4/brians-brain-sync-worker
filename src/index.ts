@@ -21,8 +21,7 @@ app.use('/', syncRoute);
 app.post('/brief/send/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log(`📧 Manual brief trigger for user ${userId}`);
-    
+console.log(`📧 Manual brief trigger for user ${userId}`);    
     const result = await briefService.sendBrief(userId);
     
     if (result.ok) {
