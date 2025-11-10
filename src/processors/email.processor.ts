@@ -2,8 +2,15 @@ import supabaseService from '../services/supabase.service';
 import storageService from '../services/storage.service';
 import extractionService from '../services/extraction.service';
 import microsoftService from '../services/microsoft.service';
+import { RuleService } from '../services/rule.service';  // ← NEW IMPORT
 
 class EmailProcessor {
+  private ruleService: RuleService;  // ← NEW PROPERTY
+
+  constructor() {
+    this.ruleService = new RuleService();  // ← NEW INITIALIZATION
+  }
+
   async processMessages(messages: any[], accessToken: string) {
     let created = 0;
     let updated = 0;
@@ -26,6 +33,22 @@ class EmailProcessor {
 
         const eventId = await supabaseService.upsertEvent(event);
         created++;
+
+        // ============================================
+        // NEW: Apply rules to the event
+        // ============================================
+        try {
+          console.log(`  🎯 Applying rules to event ${eventId}...`);
+          await this.ruleService.applyRulesToEvent(
+            eventId,
+            '3ccb8364-da19-482e-b3fa-6ee4ed40820b'  // Your user ID
+          );
+          console.log(`  ✓ Rules applied`);
+        } catch (ruleError: any) {
+          console.error(`  ⚠️  Failed to apply rules:`, ruleError.message);
+          // Continue processing - don't let rule errors stop email ingestion
+        }
+        // ============================================
 
         // Process attachments if present
         if (message.hasAttachments) {
