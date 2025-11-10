@@ -1,3 +1,4 @@
+import oauthRouter from './routes/oauth';
 import express from 'express';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
@@ -14,6 +15,7 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 // Health and sync routes
+app.use('/oauth', oauthRouter);
 app.use('/', healthRoute);
 app.use('/', syncRoute);
 
