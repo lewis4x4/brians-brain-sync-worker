@@ -161,10 +161,16 @@ export class RuleService {
       }
 
       // Increment match count on the rule
+      const { data: currentRule } = await supabase
+        .from('rules')
+        .select('match_count')
+        .eq('id', rule.id)
+        .single();
+
       await supabase
         .from('rules')
         .update({ 
-          match_count: supabase.raw('COALESCE(match_count, 0) + 1'),
+          match_count: (currentRule?.match_count || 0) + 1,
           last_matched_at: new Date().toISOString()
         })
         .eq('id', rule.id);
