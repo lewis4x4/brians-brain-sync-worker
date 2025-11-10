@@ -91,7 +91,7 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
       });
     }
 
-    const tokens = await tokenResponse.json();
+    const tokens: any = await tokenResponse.json();
 
     console.log('✅ Tokens received successfully');
 
