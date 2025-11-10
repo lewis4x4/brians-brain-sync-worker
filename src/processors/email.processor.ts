@@ -2,7 +2,7 @@ import supabaseService from '../services/supabase.service';
 import storageService from '../services/storage.service';
 import extractionService from '../services/extraction.service';
 import microsoftService from '../services/microsoft.service';
-import { RuleService } from '../services/rule.service';  // ← NEW IMPORT
+import RuleService from '../services/rule.service';
 
 class EmailProcessor {
   private ruleService: RuleService;  // ← NEW PROPERTY
