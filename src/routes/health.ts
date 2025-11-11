@@ -2,12 +2,11 @@ import { Router } from 'express';
 
 const router = Router();
 
-// Root endpoint - for n8n health checks and browser visits
 router.get('/', (req, res) => {
   res.json({
     status: 'online',
     service: 'brian-ai-brain-sync-worker',
-    message: 'Sync worker is running. Use /health for detailed status.',
+    message: 'Sync worker is running',
     timestamp: new Date().toISOString(),
     endpoints: {
       health: 'GET /health',
@@ -16,7 +15,6 @@ router.get('/', (req, res) => {
   });
 });
 
-// Detailed health check
 router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -27,17 +25,3 @@ router.get('/health', (req, res) => {
 });
 
 export default router;
-```
-
----
-
-## Step 7: Save and Exit Nano
-
-1. **Press:** `Ctrl+X`
-2. **It asks:** "Save modified buffer?"
-3. **Type:** `Y` (yes)
-4. **Press:** `Enter` (confirms filename)
-
-**You're back at the command prompt:**
-```
-brianlewis@Mac sync-worker %
