@@ -9,16 +9,16 @@ const router = Router();
 
 router.post('/sync/:connectionId', async (req, res) => {
   const { connectionId } = req.params;
-
+  
   try {
     const connection = await supabaseService.getConnection(connectionId);
     
     if (!connection) {
       return res.status(404).json({ ok: false, error: 'Connection not found' });
     }
-
+    
     performSync(connection).catch(err => console.error('Async sync error:', err));
-
+    
     return res.status(202).json({ ok: true, message: 'Sync started' });
   } catch (error: any) {
     console.error('Sync route error:', error);
@@ -33,14 +33,23 @@ async function performSync(connection: any) {
     runId = await supabaseService.createIngestionRun(connection.id);
     
     console.log('🔄 Starting sync...');
+    
     const accessToken = await tokenService.ensureValidToken(connection.id);
     
     console.log('📧 Syncing emails...');
-    const { messages } = await microsoftService.fetchMessages(accessToken);
+    // ✅ UPDATED: Add connection.account_email parameter
+    const { messages } = await microsoftService.fetchMessages(
+      accessToken,
+      connection.account_email
+    );
     const emailStats = await emailProcessor.processMessages(messages, accessToken);
     
     console.log('📅 Syncing calendar...');
-    const { events } = await microsoftService.fetchCalendarEvents(accessToken);
+    // ✅ UPDATED: Add connection.account_email parameter
+    const { events } = await microsoftService.fetchCalendarEvents(
+      accessToken,
+      connection.account_email
+    );
     const calendarStats = await calendarProcessor.processEvents(events);
     
     await supabaseService.completeIngestionRun(runId, {
@@ -53,6 +62,7 @@ async function performSync(connection: any) {
   } catch (error: any) {
     console.error('❌ Sync failed:', error.message);
     console.error('Stack:', error.stack);
+    
     if (runId) {
       await supabaseService.failIngestionRun(runId, error.message);
     }
