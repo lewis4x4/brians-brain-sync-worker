@@ -40,9 +40,10 @@ class Scheduler {
       return;
     }
 
-    for (const connection of connections) {
-      await this.syncConnection(connection);
-    }
+ for (const connection of connections) {
+  console.log('🔍 DEBUG Connection:', JSON.stringify(connection, null, 2));
+  await this.syncConnection(connection);
+}
   }
 
   private async syncConnection(connection: any) {
