@@ -11,6 +11,7 @@ class CalendarProcessor {
       try {
         const event = {
           event_type: 'meeting',
+          source: 'microsoft_graph',  // ✅ ADDED: Set source field
           external_id: graphEvent.id,
           created_at_ts: graphEvent.start?.dateTime || new Date().toISOString(),
           subject: graphEvent.subject || '(No Subject)',

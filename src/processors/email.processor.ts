@@ -5,10 +5,10 @@ import microsoftService from '../services/microsoft.service';
 import RuleService from '../services/rule.service';
 
 class EmailProcessor {
-  private ruleService: RuleService;  // ← NEW PROPERTY
+  private ruleService: RuleService;
 
   constructor() {
-    this.ruleService = new RuleService();  // ← NEW INITIALIZATION
+    this.ruleService = new RuleService();
   }
 
   async processMessages(messages: any[], accessToken: string) {
@@ -21,6 +21,7 @@ class EmailProcessor {
       try {
         const event = {
           event_type: 'email',
+          source: 'microsoft_graph',  // ✅ ADDED: Set source field
           external_id: message.id,
           created_at_ts: message.receivedDateTime || new Date().toISOString(),
           subject: message.subject || '(No Subject)',
@@ -34,21 +35,17 @@ class EmailProcessor {
         const eventId = await supabaseService.upsertEvent(event);
         created++;
 
-        // ============================================
-        // NEW: Apply rules to the event
-        // ============================================
+        // Apply rules to the event
         try {
           console.log(`  🎯 Applying rules to event ${eventId}...`);
           await this.ruleService.applyRulesToEvent(
             eventId,
-            '3ccb8364-da19-482e-b3fa-6ee4ed40820b'  // Your user ID
+            '3ccb8364-da19-782e-b3fa-6ee4ed40820b'
           );
           console.log(`  ✓ Rules applied`);
         } catch (ruleError: any) {
           console.error(`  ⚠️  Failed to apply rules:`, ruleError.message);
-          // Continue processing - don't let rule errors stop email ingestion
         }
-        // ============================================
 
         // Process attachments if present
         if (message.hasAttachments) {
@@ -56,7 +53,6 @@ class EmailProcessor {
             await this.processAttachments(message.id, eventId, accessToken);
           } catch (error: any) {
             console.error(`  ⚠️  Failed to process attachments for ${message.id}:`, error.message);
-            // Continue processing other emails even if attachments fail
           }
         }
       } catch (error) {
@@ -122,7 +118,6 @@ class EmailProcessor {
         console.log(`  📎 Processed attachment: ${attachment.name} (${this.formatBytes(attachment.size)})`);
       } catch (error: any) {
         console.error(`  ⚠️  Failed to process attachment ${attachment.name}:`, error.message);
-        // Continue with other attachments
       }
     }
   }
