@@ -11,9 +11,9 @@ class Scheduler {
   start() {
     const intervalMinutes = parseInt(process.env.SYNC_INTERVAL_MINUTES || '5');
     const cronExpression = `*/${intervalMinutes} * * * *`;
-
+    
     console.log(`Starting scheduler: syncing every ${intervalMinutes} minutes`);
-
+    
     cron.schedule(cronExpression, async () => {
       if (this.isRunning) {
         console.log('Previous sync still running, skipping...');
@@ -33,8 +33,9 @@ class Scheduler {
 
   private async syncAllConnections() {
     console.log('Starting scheduled sync...');
+    
     const connections = await supabaseService.getActiveConnections();
-
+    
     if (!connections.length) {
       console.log('No active connections');
       return;
@@ -46,30 +47,43 @@ class Scheduler {
   }
 
   private async syncConnection(connection: any) {
-    const runId = await supabaseService.createIngestionRun(connection.id);
+    // ✅ Safety check: verify email exists
+    if (!connection.config?.email) {
+      console.error('❌ No email found in connection config:', connection.id);
+      return;
+    }
 
+    console.log(`🔄 Syncing ${connection.config.email}...`);
+    
+    const runId = await supabaseService.createIngestionRun(connection.id);
+    
     try {
       const accessToken = await tokenService.ensureValidToken(connection.id);
-
+      
+      // ✅ FIXED: Use connection.config.email (not connection.account_email)
       const { messages } = await microsoftService.fetchMessages(
         accessToken,
-        connection.config.email  // ✅ FIXED: was connection.account_email
+        connection.config.email
       );
+      
       const emailStats = await emailProcessor.processMessages(messages, accessToken);
-
+      
+      // ✅ FIXED: Use connection.config.email (not connection.account_email)
       const { events } = await microsoftService.fetchCalendarEvents(
         accessToken,
-        connection.config.email  // ✅ FIXED: was connection.account_email
+        connection.config.email
       );
+      
       const calendarStats = await calendarProcessor.processEvents(events);
-
+      
       await supabaseService.completeIngestionRun(runId, {
         items_processed: messages.length + events.length,
         items_created: emailStats.created + calendarStats.created,
         items_updated: 0
       });
-
+      
       console.log('✅ Sync completed successfully');
+      
     } catch (error: any) {
       console.error('❌ Sync failed:', error.message);
       await supabaseService.failIngestionRun(runId, error.message);
