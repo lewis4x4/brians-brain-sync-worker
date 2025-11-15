@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const USER_ID = '3ccb8364-da19-482e-b3fa-6ee4ed40820b';
+const USER_ID = '3ccb8364-da19-782e-b3fa-6ee4ed40820b';
 
 export class MicrosoftService {
   
@@ -183,6 +183,8 @@ export class MicrosoftService {
 
   /**
    * Fetch calendar events using delta queries
+   * ✅ FIXED: Use calendarView/delta (not calendar/events/delta)
+   * Calendar delta MUST use calendarView endpoint with startDateTime/endDateTime
    */
   async fetchCalendarEvents(
     accessToken: string, 
@@ -213,8 +215,9 @@ export class MicrosoftService {
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + 90);
         
-        // Calendar uses different delta endpoint
-        url = `/me/calendar/events/delta?$filter=start/dateTime ge '${startDate.toISOString()}' and end/dateTime le '${endDate.toISOString()}'&$select=id,subject,start,end,attendees,body,location,organizer&$top=50`;
+        // ✅ FIXED: Calendar must use calendarView/delta with query params
+        // NOT calendar/events/delta with $filter (that causes the error)
+        url = `/me/calendarView/delta?startDateTime=${startDate.toISOString()}&endDateTime=${endDate.toISOString()}`;
       }
 
       // Fetch events (handle pagination)
