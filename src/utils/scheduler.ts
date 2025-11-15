@@ -51,10 +51,17 @@ class Scheduler {
     try {
       const accessToken = await tokenService.ensureValidToken(connection.id);
       
-      const { messages } = await microsoftService.fetchMessages(accessToken);
+      const { messages } = await microsoftService.fetchMessages(
+  accessToken,
+  connection.account_email
+);
+      
       const emailStats = await emailProcessor.processMessages(messages, accessToken);
       
-      const { events } = await microsoftService.fetchCalendarEvents(accessToken);
+     const { events } = await microsoftService.fetchCalendarEvents(
+  accessToken,
+  connection.account_email
+);
       const calendarStats = await calendarProcessor.processEvents(events);
       
       await supabaseService.completeIngestionRun(runId, {
