@@ -21,7 +21,7 @@ class EmailProcessor {
       try {
         const event = {
           event_type: 'email',
-          source: 'microsoft_graph',  // ✅ ADDED: Set source field
+          source: 'microsoft_graph',
           external_id: message.id,
           created_at_ts: message.receivedDateTime || new Date().toISOString(),
           subject: message.subject || '(No Subject)',
@@ -29,7 +29,8 @@ class EmailProcessor {
           metadata: {
             from: message.from?.emailAddress?.address,
             is_read: message.isRead
-          }
+          },
+          raw: message  // ✅ FIXED: Store complete Graph API response
         };
 
         const eventId = await supabaseService.upsertEvent(event);
