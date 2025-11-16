@@ -1,5 +1,5 @@
 // ================================================================
-// OAuth Callback Handler - Add to sync-worker
+// OAuth Callback Handler - CORRECTED for actual schema
 // Location: ~/Desktop/sync-worker/src/routes/oauth.ts
 // ================================================================
 import express, { Request, Response } from 'express';
@@ -18,23 +18,6 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Create Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-// Encryption key (same as token.service.ts)
-const ENCRYPTION_KEY = crypto
-  .createHash('sha256')
-  .update(SUPABASE_SERVICE_KEY.slice(0, 32))
-  .digest();
-
-/**
- * Encrypt a token using AES-256-CBC
- */
-function encryptToken(text: string): string {
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return `${iv.toString('hex')}:${encrypted}`;
-}
 
 /**
  * POST /oauth/microsoft/exchange
@@ -74,7 +57,7 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
           code: code,
           redirect_uri: MICROSOFT_REDIRECT_URI,
           grant_type: 'authorization_code',
-          scope: 'offline_access User.Read Mail.Read Calendars.Read Contacts.Read', // ✅ ADDED: Contacts.Read
+          scope: 'offline_access User.Read Mail.Read Calendars.Read Contacts.Read',
         }),
       }
     );
@@ -94,26 +77,27 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
     // Calculate token expiration
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-    // Encrypt tokens
-    const encryptedAccessToken = encryptToken(tokens.access_token);
-    const encryptedRefreshToken = tokens.refresh_token 
-      ? encryptToken(tokens.refresh_token) 
-      : null;
+    // ✅ FIXED: Store tokens in secret_ref as JSON (matching actual schema)
+    const secretRef = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || null,
+      expires_at: expiresAt
+    };
 
-    console.log('🔒 Tokens encrypted');
+    console.log('📦 Preparing to save connection...');
 
-    // Create connection in database
+    // ✅ FIXED: Use secret_ref column instead of encrypted_* columns
     const { data, error: dbError } = await supabase
       .from('integration_connections')
       .insert({
+        user_id: userId,
         provider_key: 'microsoft_365',
         name: connectionName,
         status: 'connected',
-        encrypted_access_token: encryptedAccessToken,
-        encrypted_refresh_token: encryptedRefreshToken,
-        token_expires_at: expiresAt,
+        secret_ref: secretRef,
         config: {
-          scopes: ['User.Read', 'Mail.Read', 'Calendars.Read', 'Contacts.Read'] // ✅ ADDED: Contacts.Read
+          email: tokens.email || connectionName.includes('Redex') ? 'brian.lewis@goredex.com' : 'blewis@lewisinsurance.com',
+          scopes: ['User.Read', 'Mail.Read', 'Calendars.Read', 'Contacts.Read']
         }
       })
       .select()
@@ -155,8 +139,8 @@ router.get('/microsoft/authorize-url', (req: Request, res: Response) => {
   authUrl.searchParams.append('response_type', 'code');
   authUrl.searchParams.append('redirect_uri', MICROSOFT_REDIRECT_URI);
   authUrl.searchParams.append('response_mode', 'query');
-  authUrl.searchParams.append('scope', 'offline_access User.Read Mail.Read Calendars.Read Contacts.Read'); // ✅ ADDED: Contacts.Read
-  authUrl.searchParams.append('state', crypto.randomBytes(16).toString('hex')); // CSRF protection
+  authUrl.searchParams.append('scope', 'offline_access User.Read Mail.Read Calendars.Read Contacts.Read');
+  authUrl.searchParams.append('state', crypto.randomBytes(16).toString('hex'));
 
   res.json({
     url: authUrl.toString()
