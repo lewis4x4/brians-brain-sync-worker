@@ -20,6 +20,7 @@ class EmailProcessor {
     for (const message of messages) {
       try {
         const event = {
+          user_id: '3ccb8364-da19-782e-b3fa-6ee4ed40820b',
           event_type: 'email',
           source: 'microsoft_graph',
           external_id: message.id,
@@ -30,13 +31,12 @@ class EmailProcessor {
             from: message.from?.emailAddress?.address,
             is_read: message.isRead
           },
-          raw: message  // ✅ FIXED: Store complete Graph API response
+          raw: message
         };
 
         const eventId = await supabaseService.upsertEvent(event);
         created++;
 
-        // Apply rules to the event
         try {
           console.log(`  🎯 Applying rules to event ${eventId}...`);
           await this.ruleService.applyRulesToEvent(
@@ -48,7 +48,6 @@ class EmailProcessor {
           console.error(`  ⚠️  Failed to apply rules:`, ruleError.message);
         }
 
-        // Process attachments if present
         if (message.hasAttachments) {
           try {
             await this.processAttachments(message.id, eventId, accessToken);
@@ -69,11 +68,9 @@ class EmailProcessor {
     const attachments = await microsoftService.fetchAttachments(messageId, accessToken);
 
     for (const attachment of attachments) {
-      // Skip inline/embedded images
       if (attachment.isInline) continue;
 
       try {
-        // Check if attachment already exists
         const existingAttachment = await supabaseService.checkAttachmentExists(
           eventId,
           attachment.name
@@ -84,14 +81,12 @@ class EmailProcessor {
           continue;
         }
 
-        // Download attachment content
         const content = await microsoftService.downloadAttachment(
           messageId,
           attachment.id,
           accessToken
         );
 
-        // Upload to Supabase Storage
         const storagePath = await storageService.uploadAttachment(
           eventId,
           attachment.name,
@@ -99,14 +94,12 @@ class EmailProcessor {
           attachment.contentType
         );
 
-        // Extract text if possible
         const extractedText = await extractionService.extractText(
           content,
           attachment.contentType,
           attachment.name
         );
 
-        // Save to database
         await supabaseService.createAttachment({
           event_id: eventId,
           filename: attachment.name,
@@ -132,5 +125,4 @@ class EmailProcessor {
   }
 }
 
-export { EmailProcessor };
 export default new EmailProcessor();

@@ -10,6 +10,7 @@ class CalendarProcessor {
     for (const graphEvent of events) {
       try {
         const event = {
+          user_id: '3ccb8364-da19-782e-b3fa-6ee4ed40820b',
           event_type: 'meeting',
           source: 'microsoft_graph',
           external_id: graphEvent.id,
