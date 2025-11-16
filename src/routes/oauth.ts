@@ -2,7 +2,6 @@
 // OAuth Callback Handler - Add to sync-worker
 // Location: ~/Desktop/sync-worker/src/routes/oauth.ts
 // ================================================================
-
 import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
@@ -50,11 +49,9 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
     if (!code) {
       return res.status(400).json({ error: 'Authorization code required' });
     }
-
     if (!connectionName) {
       return res.status(400).json({ error: 'Connection name required' });
     }
-
     if (!userId) {
       return res.status(400).json({ error: 'User ID required' });
     }
@@ -77,7 +74,7 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
           code: code,
           redirect_uri: MICROSOFT_REDIRECT_URI,
           grant_type: 'authorization_code',
-          scope: 'offline_access User.Read Mail.Read Calendars.Read',
+          scope: 'offline_access User.Read Mail.Read Calendars.Read Contacts.Read', // ✅ ADDED: Contacts.Read
         }),
       }
     );
@@ -92,7 +89,6 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
     }
 
     const tokens: any = await tokenResponse.json();
-
     console.log('✅ Tokens received successfully');
 
     // Calculate token expiration
@@ -117,7 +113,7 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
         encrypted_refresh_token: encryptedRefreshToken,
         token_expires_at: expiresAt,
         config: {
-          scopes: ['User.Read', 'Mail.Read', 'Calendars.Read']
+          scopes: ['User.Read', 'Mail.Read', 'Calendars.Read', 'Contacts.Read'] // ✅ ADDED: Contacts.Read
         }
       })
       .select()
@@ -137,7 +133,6 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
       connection_name: data.name,
       expires_at: expiresAt
     });
-
   } catch (error: any) {
     console.error('❌ OAuth exchange error:', error);
     res.status(500).json({ 
@@ -160,7 +155,7 @@ router.get('/microsoft/authorize-url', (req: Request, res: Response) => {
   authUrl.searchParams.append('response_type', 'code');
   authUrl.searchParams.append('redirect_uri', MICROSOFT_REDIRECT_URI);
   authUrl.searchParams.append('response_mode', 'query');
-  authUrl.searchParams.append('scope', 'offline_access User.Read Mail.Read Calendars.Read');
+  authUrl.searchParams.append('scope', 'offline_access User.Read Mail.Read Calendars.Read Contacts.Read'); // ✅ ADDED: Contacts.Read
   authUrl.searchParams.append('state', crypto.randomBytes(16).toString('hex')); // CSRF protection
 
   res.json({
