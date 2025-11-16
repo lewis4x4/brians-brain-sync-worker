@@ -1,5 +1,5 @@
 // ================================================================
-// OAuth Callback Handler - CORRECTED for actual schema
+// OAuth Callback Handler - CORRECTED without user_id
 // Location: ~/Desktop/sync-worker/src/routes/oauth.ts
 // ================================================================
 import express, { Request, Response } from 'express';
@@ -27,7 +27,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
  */
 router.post('/microsoft/exchange', async (req: Request, res: Response) => {
   try {
-    const { code, connectionName, userId } = req.body;
+    const { code, connectionName } = req.body;
 
     if (!code) {
       return res.status(400).json({ error: 'Authorization code required' });
@@ -35,13 +35,9 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
     if (!connectionName) {
       return res.status(400).json({ error: 'Connection name required' });
     }
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
-    }
 
     console.log('🔐 Exchanging OAuth code for tokens...');
     console.log(`   Connection name: ${connectionName}`);
-    console.log(`   User ID: ${userId}`);
 
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(
@@ -77,26 +73,30 @@ router.post('/microsoft/exchange', async (req: Request, res: Response) => {
     // Calculate token expiration
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-    // ✅ FIXED: Store tokens in secret_ref as JSON (matching actual schema)
+    // Store tokens in secret_ref as JSON
     const secretRef = {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || null,
       expires_at: expiresAt
     };
 
+    // Determine email from connection name
+    const email = connectionName.includes('Redex') 
+      ? 'brian.lewis@goredex.com' 
+      : 'blewis@lewisinsurance.com';
+
     console.log('📦 Preparing to save connection...');
 
-    // ✅ FIXED: Use secret_ref column instead of encrypted_* columns
+    // ✅ FIXED: Removed user_id, only use columns that exist
     const { data, error: dbError } = await supabase
       .from('integration_connections')
       .insert({
-        user_id: userId,
         provider_key: 'microsoft_365',
         name: connectionName,
         status: 'connected',
         secret_ref: secretRef,
         config: {
-          email: tokens.email || connectionName.includes('Redex') ? 'brian.lewis@goredex.com' : 'blewis@lewisinsurance.com',
+          email: email,
           scopes: ['User.Read', 'Mail.Read', 'Calendars.Read', 'Contacts.Read']
         }
       })
