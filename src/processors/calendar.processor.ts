@@ -85,15 +85,13 @@ export default class CalendarProcessor {
    * NOTE: Method name is processEvents (not processCalendarEvents)
    */
   static async processEvents(
-    events: any[],
-    connectionId: string,
-    connectionEmail: string
-  ): Promise<{ inserted: number; duplicates: number; skipped: number }> {
-    console.log('[CALENDAR PROCESSOR] Processing ' + events.length + ' events for ' + connectionEmail);
+    events: any[]
+  ): Promise<{ created: number; duplicates: number; skipped: number }> {
+    console.log('[CALENDAR PROCESSOR] Processing ' + events.length + ' events');
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    let inserted = 0;
+    let created = 0;
     let skipped = 0;
     let duplicates = 0;
 
@@ -172,7 +170,7 @@ export default class CalendarProcessor {
           });
           skipped++;
         } else {
-          inserted++;
+          created++;
         }
 
       } catch (err) {
@@ -184,8 +182,8 @@ export default class CalendarProcessor {
       }
     }
 
-    console.log('[CALENDAR PROCESSOR] Complete: ' + inserted + ' inserted, ' + duplicates + ' duplicates prevented, ' + skipped + ' skipped');
+    console.log('[CALENDAR PROCESSOR] Complete: ' + created + ' created, ' + duplicates + ' duplicates prevented, ' + skipped + ' skipped');
     
-    return { inserted, duplicates, skipped };
+    return { created, duplicates, skipped };
   }
 }

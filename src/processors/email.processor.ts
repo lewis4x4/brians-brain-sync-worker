@@ -85,14 +85,13 @@ export default class EmailProcessor {
    */
   static async processMessages(
     messages: any[],
-    connectionId: string,
-    connectionEmail: string
-  ): Promise<{ inserted: number; duplicates: number; skipped: number }> {
-    console.log('[EMAIL PROCESSOR] Processing ' + messages.length + ' messages for ' + connectionEmail);
+    connectionId: string
+  ): Promise<{ created: number; duplicates: number; skipped: number }> {
+    console.log('[EMAIL PROCESSOR] Processing ' + messages.length + ' messages');
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    let inserted = 0;
+    let created = 0;
     let skipped = 0;
     let duplicates = 0;
 
@@ -163,7 +162,7 @@ export default class EmailProcessor {
           });
           skipped++;
         } else {
-          inserted++;
+          created++;
         }
 
       } catch (err) {
@@ -175,8 +174,8 @@ export default class EmailProcessor {
       }
     }
 
-    console.log('[EMAIL PROCESSOR] Complete: ' + inserted + ' inserted, ' + duplicates + ' duplicates prevented, ' + skipped + ' skipped');
+    console.log('[EMAIL PROCESSOR] Complete: ' + created + ' created, ' + duplicates + ' duplicates prevented, ' + skipped + ' skipped');
     
-    return { inserted, duplicates, skipped };
+    return { created, duplicates, skipped };
   }
 }
