@@ -1,10 +1,13 @@
-cat > calendar.processor.ts << 'EOF'
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export default class CalendarProcessor {
+  /**
+   * Check if a calendar event already exists based on iCalUId
+   * @returns existing event if found, null otherwise
+   */
   private static async checkForDuplicateEvent(
     supabase: SupabaseClient,
     iCalUId: string,
@@ -20,16 +23,19 @@ export default class CalendarProcessor {
 
       if (error) {
         console.error('[DUPLICATE CHECK ERROR]', error);
-        return null;
+        return null; // Fail-safe: allow insert if check fails
       }
 
       return data;
     } catch (err) {
       console.error('[DUPLICATE CHECK EXCEPTION]', err);
-      return null;
+      return null; // Fail-safe: allow insert if check fails
     }
   }
 
+  /**
+   * Log when we prevent a duplicate insertion
+   */
   private static async logDuplicatePrevented(
     supabase: SupabaseClient,
     iCalUId: string,
@@ -48,16 +54,22 @@ export default class CalendarProcessor {
         }
       });
     } catch (err) {
+      // Don't fail the sync if logging fails
       console.error('[DUPLICATE LOG ERROR]', err);
     }
   }
 
+  /**
+   * Extract plain text from event body
+   */
   private static extractBodyText(body: any): string {
     if (!body) return '';
 
+    // Prefer plain text, fall back to HTML
     if (body.contentType === 'text') {
       return body.content || '';
     } else if (body.contentType === 'html') {
+      // Basic HTML stripping
       return (body.content || '')
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -67,12 +79,17 @@ export default class CalendarProcessor {
     return body.content || '';
   }
 
+  /**
+   * Process calendar events from Microsoft Graph API
+   * STATIC method - called as CalendarProcessor.processEvents()
+   * NOTE: Method name is processEvents (not processCalendarEvents)
+   */
   static async processEvents(
     events: any[],
     connectionId: string,
     connectionEmail: string
   ): Promise<{ inserted: number; duplicates: number; skipped: number }> {
-    console.log(\`[CALENDAR PROCESSOR] Processing \${events.length} events for \${connectionEmail}\`);
+    console.log('[CALENDAR PROCESSOR] Processing ' + events.length + ' events for ' + connectionEmail);
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
@@ -90,6 +107,7 @@ export default class CalendarProcessor {
           continue;
         }
 
+        // ===== DUPLICATE CHECK =====
         const existing = await this.checkForDuplicateEvent(supabase, iCalUId, event.subject);
         
         if (existing) {
@@ -100,12 +118,15 @@ export default class CalendarProcessor {
             firstSeen: existing.created_at_ts
           });
           
+          // Log the prevented duplicate
           await this.logDuplicatePrevented(supabase, iCalUId, event.subject, existing.id);
           
           duplicates++;
-          continue;
+          continue; // Skip to next event
         }
+        // ===== END DUPLICATE CHECK =====
 
+        // If we get here, it's not a duplicate - proceed with insert
         const eventData = {
           user_id: '3ccb8364-da19-482e-b3fa-6ee4ed40820b',
           event_type: 'meeting',
@@ -136,7 +157,7 @@ export default class CalendarProcessor {
             sensitivity: event.sensitivity,
             webLink: event.webLink
           },
-          raw: event
+          raw: event // CRITICAL: Store complete event with iCalUId
         };
 
         const { error } = await supabase
@@ -163,11 +184,8 @@ export default class CalendarProcessor {
       }
     }
 
-    console.log(\`[CALENDAR PROCESSOR] Complete: \${inserted} inserted, \${duplicates} duplicates prevented, \${skipped} skipped\`);
+    console.log('[CALENDAR PROCESSOR] Complete: ' + inserted + ' inserted, ' + duplicates + ' duplicates prevented, ' + skipped + ' skipped');
     
     return { inserted, duplicates, skipped };
   }
 }
-EOF
-
-echo "calendar.processor.ts created!"
