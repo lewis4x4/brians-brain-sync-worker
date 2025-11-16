@@ -1,25 +1,17 @@
+cat > calendar.processor.ts << 'EOF'
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export default class CalendarProcessor {
-  private supabase: SupabaseClient;
-
-  constructor() {
-    this.supabase = createClient(supabaseUrl, supabaseServiceKey);
-  }
-
-  /**
-   * Check if a calendar event already exists based on iCalUId
-   * @returns existing event if found, null otherwise
-   */
-  private async checkForDuplicateEvent(
+  private static async checkForDuplicateEvent(
+    supabase: SupabaseClient,
     iCalUId: string,
     subject: string
   ): Promise<{ id: string; subject: string; created_at_ts: string } | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await supabase
         .from('events')
         .select('id, subject, created_at_ts')
         .eq('event_type', 'meeting')
@@ -28,26 +20,24 @@ export default class CalendarProcessor {
 
       if (error) {
         console.error('[DUPLICATE CHECK ERROR]', error);
-        return null; // Fail-safe: allow insert if check fails
+        return null;
       }
 
       return data;
     } catch (err) {
       console.error('[DUPLICATE CHECK EXCEPTION]', err);
-      return null; // Fail-safe: allow insert if check fails
+      return null;
     }
   }
 
-  /**
-   * Log when we prevent a duplicate insertion
-   */
-  private async logDuplicatePrevented(
+  private static async logDuplicatePrevented(
+    supabase: SupabaseClient,
     iCalUId: string,
     subject: string,
     existingEventId: string
   ): Promise<void> {
     try {
-      await this.supabase.from('duplicate_prevention_log').insert({
+      await supabase.from('duplicate_prevention_log').insert({
         event_type: 'meeting',
         identifier: iCalUId,
         subject: subject,
@@ -58,22 +48,16 @@ export default class CalendarProcessor {
         }
       });
     } catch (err) {
-      // Don't fail the sync if logging fails
       console.error('[DUPLICATE LOG ERROR]', err);
     }
   }
 
-  /**
-   * Extract plain text from event body
-   */
-  private extractBodyText(body: any): string {
+  private static extractBodyText(body: any): string {
     if (!body) return '';
 
-    // Prefer plain text, fall back to HTML
     if (body.contentType === 'text') {
       return body.content || '';
     } else if (body.contentType === 'html') {
-      // Basic HTML stripping
       return (body.content || '')
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -83,15 +67,14 @@ export default class CalendarProcessor {
     return body.content || '';
   }
 
-  /**
-   * Process calendar events from Microsoft Graph API
-   */
-  async processCalendarEvents(
+  static async processEvents(
     events: any[],
     connectionId: string,
     connectionEmail: string
   ): Promise<{ inserted: number; duplicates: number; skipped: number }> {
-    console.log(`[CALENDAR PROCESSOR] Processing ${events.length} events for ${connectionEmail}`);
+    console.log(\`[CALENDAR PROCESSOR] Processing \${events.length} events for \${connectionEmail}\`);
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     let inserted = 0;
     let skipped = 0;
@@ -107,8 +90,7 @@ export default class CalendarProcessor {
           continue;
         }
 
-        // ===== DUPLICATE CHECK =====
-        const existing = await this.checkForDuplicateEvent(iCalUId, event.subject);
+        const existing = await this.checkForDuplicateEvent(supabase, iCalUId, event.subject);
         
         if (existing) {
           console.log('[DUPLICATE SKIP] Calendar event already exists:', {
@@ -118,15 +100,12 @@ export default class CalendarProcessor {
             firstSeen: existing.created_at_ts
           });
           
-          // Log the prevented duplicate
-          await this.logDuplicatePrevented(iCalUId, event.subject, existing.id);
+          await this.logDuplicatePrevented(supabase, iCalUId, event.subject, existing.id);
           
           duplicates++;
-          continue; // Skip to next event
+          continue;
         }
-        // ===== END DUPLICATE CHECK =====
 
-        // If we get here, it's not a duplicate - proceed with insert
         const eventData = {
           user_id: '3ccb8364-da19-482e-b3fa-6ee4ed40820b',
           event_type: 'meeting',
@@ -157,10 +136,10 @@ export default class CalendarProcessor {
             sensitivity: event.sensitivity,
             webLink: event.webLink
           },
-          raw: event // CRITICAL: Store complete event with iCalUId
+          raw: event
         };
 
-        const { error } = await this.supabase
+        const { error } = await supabase
           .from('events')
           .insert(eventData);
 
@@ -184,8 +163,11 @@ export default class CalendarProcessor {
       }
     }
 
-    console.log(`[CALENDAR PROCESSOR] Complete: ${inserted} inserted, ${duplicates} duplicates prevented, ${skipped} skipped`);
+    console.log(\`[CALENDAR PROCESSOR] Complete: \${inserted} inserted, \${duplicates} duplicates prevented, \${skipped} skipped\`);
     
     return { inserted, duplicates, skipped };
   }
 }
+EOF
+
+echo "calendar.processor.ts created!"
