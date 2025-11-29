@@ -6,6 +6,7 @@ import healthRoute from './routes/health';
 import syncRoute from './routes/sync';
 import scheduler from './utils/scheduler';
 import briefService from './services/brief.service';
+import { EnrichmentService } from './services/enrichment.service';
 
 dotenv.config();
 
@@ -55,6 +56,53 @@ app.get('/brief/preview/:userId', async (req, res) => {
     res.send('Brief preview endpoint - implement if needed');
   } catch (error: any) {
     res.status(500).send(error.message);
+  }
+});
+
+// =====================================================
+// Enrichment Endpoints
+// =====================================================
+
+const enrichmentService = new EnrichmentService();
+
+// Backfill enrichment for existing events
+app.post('/enrichment/backfill', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    console.log(`🏷️ Starting enrichment backfill (limit: ${limit})`);
+
+    const count = await enrichmentService.backfillEnrichment(limit);
+
+    res.json({
+      success: true,
+      message: `Enriched ${count} events`,
+      count
+    });
+  } catch (error: any) {
+    console.error('Enrichment backfill error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Enrich a single event by ID
+app.post('/enrichment/event/:eventId', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    console.log(`🏷️ Enriching event ${eventId}`);
+
+    const result = await enrichmentService.enrichEvent(eventId);
+
+    if (result) {
+      res.json({
+        success: true,
+        enrichment: result
+      });
+    } else {
+      res.status(404).json({ success: false, error: 'Event not found or enrichment failed' });
+    }
+  } catch (error: any) {
+    console.error('Event enrichment error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

@@ -34,6 +34,21 @@ interface Event {
   importance?: number;
 }
 
+// Enrichment data structure (from enrichment.service.ts)
+interface EnrichmentData {
+  category?: string;
+  topics?: string[];
+  actions?: string[];
+  senderType?: string;
+  isVip?: boolean;
+  entities?: {
+    people?: string[];
+    companies?: string[];
+    amounts?: string[];
+    dates?: string[];
+  };
+}
+
 export class RuleService {
   /**
    * Apply all active rules to a newly ingested event
@@ -88,8 +103,52 @@ export class RuleService {
 
   /**
    * Evaluate if a rule matches an event
+   * Supports both traditional fields and enrichment-based fields
    */
   private evaluateRule(rule: Rule, event: Event): boolean {
+    const enrichment: EnrichmentData = event.metadata?.enrichment || {};
+
+    // Handle enrichment-based match fields
+    switch (rule.match_field) {
+      case 'category':
+        // Match on enrichment category (newsletter, action-item, fyi, etc.)
+        return this.matchArrayOrString(enrichment.category, rule.match_values, rule.match_operator);
+
+      case 'topic':
+        // Match on enrichment topics (finance, travel, legal, etc.)
+        return this.matchArray(enrichment.topics || [], rule.match_values, rule.match_operator);
+
+      case 'action':
+        // Match on enrichment actions (reply-needed, review-needed, deadline)
+        return this.matchArray(enrichment.actions || [], rule.match_values, rule.match_operator);
+
+      case 'sender_type':
+        // Match on sender type (automated, external, internal)
+        return this.matchArrayOrString(enrichment.senderType, rule.match_values, rule.match_operator);
+
+      case 'is_vip':
+        // Match on VIP status (true/false)
+        const isVipMatch = rule.match_values.some(v => v.toLowerCase() === 'true');
+        return enrichment.isVip === isVipMatch;
+
+      case 'entity_person':
+        // Match on extracted people names
+        return this.matchArray(enrichment.entities?.people || [], rule.match_values, rule.match_operator);
+
+      case 'entity_company':
+        // Match on extracted company names
+        return this.matchArray(enrichment.entities?.companies || [], rule.match_values, rule.match_operator);
+
+      case 'has_amount':
+        // Check if any monetary amounts were extracted
+        return (enrichment.entities?.amounts?.length || 0) > 0;
+
+      case 'has_deadline':
+        // Check if any dates/deadlines were extracted
+        return (enrichment.entities?.dates?.length || 0) > 0;
+    }
+
+    // Traditional field matching
     let fieldValue: string;
 
     switch (rule.match_field) {
@@ -135,6 +194,48 @@ export class RuleService {
         return matchValues.some(domain => fieldValue.includes(domain));
       default:
         return false;
+    }
+  }
+
+  /**
+   * Match a single string value against match values
+   */
+  private matchArrayOrString(value: string | undefined, matchValues: string[], operator: string): boolean {
+    if (!value) return false;
+    const lowerValue = value.toLowerCase();
+    const lowerMatchValues = matchValues.map(v => v.toLowerCase());
+
+    switch (operator) {
+      case 'equals':
+        return lowerMatchValues.some(mv => lowerValue === mv);
+      case 'contains_any':
+      case 'contains':
+        return lowerMatchValues.some(mv => lowerValue.includes(mv));
+      default:
+        return lowerMatchValues.some(mv => lowerValue === mv);
+    }
+  }
+
+  /**
+   * Match an array of values against match values
+   */
+  private matchArray(values: string[], matchValues: string[], operator: string): boolean {
+    if (!values || values.length === 0) return false;
+    const lowerValues = values.map(v => v.toLowerCase());
+    const lowerMatchValues = matchValues.map(v => v.toLowerCase());
+
+    switch (operator) {
+      case 'contains_any':
+        // Any value in the array matches any match value
+        return lowerValues.some(v => lowerMatchValues.some(mv => v.includes(mv)));
+      case 'contains':
+        // All match values must be found in the array
+        return lowerMatchValues.every(mv => lowerValues.some(v => v.includes(mv)));
+      case 'equals':
+        // Any exact match
+        return lowerValues.some(v => lowerMatchValues.includes(v));
+      default:
+        return lowerValues.some(v => lowerMatchValues.includes(v));
     }
   }
 
