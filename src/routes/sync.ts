@@ -43,15 +43,21 @@ async function performSync(connection: any) {
     
     const accessToken = await tokenService.ensureValidToken(connection.id);
     
-    console.log('📧 Syncing emails...');
-    // ✅ FIXED: Use connection.config.email (not connection.account_email)
-    const { messages } = await microsoftService.fetchMessages(
-      accessToken,
-      connection.config.email
-    );
-    
-    const emailStats = await emailProcessor.processMessages(messages, accessToken);
-    
+    console.log('📧 Syncing emails (inbox + sent)...');
+    const [{ messages: inboxMessages }, { messages: sentMessages }] = await Promise.all([
+      microsoftService.fetchMessages(accessToken, connection.config.email, 30, 'inbox'),
+      microsoftService.fetchMessages(accessToken, connection.config.email, 30, 'sentitems'),
+    ]);
+
+    const inboxStats = await emailProcessor.processMessages(inboxMessages, connection.id, connection.config.email, 'inbox');
+    const sentStats = await emailProcessor.processMessages(sentMessages, connection.id, connection.config.email, 'sentitems');
+    const emailStats = {
+      created: inboxStats.created + sentStats.created,
+      duplicates: inboxStats.duplicates + sentStats.duplicates,
+      skipped: inboxStats.skipped + sentStats.skipped,
+    };
+    const messages = [...inboxMessages, ...sentMessages];
+
     console.log('📅 Syncing calendar...');
     // ✅ FIXED: Use connection.config.email (not connection.account_email)
     const { events } = await microsoftService.fetchCalendarEvents(

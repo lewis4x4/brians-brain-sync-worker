@@ -60,22 +60,28 @@ class Scheduler {
     try {
       const accessToken = await tokenService.ensureValidToken(connection.id);
       
-      // ✅ FIXED: Use connection.config.email (not connection.account_email)
-      const { messages } = await microsoftService.fetchMessages(
-        accessToken,
-        connection.config.email
-      );
-      
-      const emailStats = await emailProcessor.processMessages(messages, accessToken);
-      
-      // ✅ FIXED: Use connection.config.email (not connection.account_email)
+      // Sync inbox + sent emails in parallel
+      const [{ messages: inboxMessages }, { messages: sentMessages }] = await Promise.all([
+        microsoftService.fetchMessages(accessToken, connection.config.email, 30, 'inbox'),
+        microsoftService.fetchMessages(accessToken, connection.config.email, 30, 'sentitems'),
+      ]);
+
+      const inboxStats = await emailProcessor.processMessages(inboxMessages, connection.id, connection.config.email, 'inbox');
+      const sentStats = await emailProcessor.processMessages(sentMessages, connection.id, connection.config.email, 'sentitems');
+      const emailStats = {
+        created: inboxStats.created + sentStats.created,
+        duplicates: inboxStats.duplicates + sentStats.duplicates,
+        skipped: inboxStats.skipped + sentStats.skipped,
+      };
+      const messages = [...inboxMessages, ...sentMessages];
+
       const { events } = await microsoftService.fetchCalendarEvents(
         accessToken,
         connection.config.email
       );
-      
+
       const calendarStats = await calendarProcessor.processEvents(events);
-      
+
       await supabaseService.completeIngestionRun(runId, {
         items_processed: messages.length + events.length,
         items_created: emailStats.created + calendarStats.created,

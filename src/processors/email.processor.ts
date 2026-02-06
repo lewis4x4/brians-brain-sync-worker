@@ -85,9 +85,11 @@ export default class EmailProcessor {
    */
   static async processMessages(
     messages: any[],
-    connectionId: string
+    connectionId: string,
+    accountEmail?: string,
+    folder: string = 'inbox'
   ): Promise<{ created: number; duplicates: number; skipped: number }> {
-    console.log('[EMAIL PROCESSOR] Processing ' + messages.length + ' messages');
+    console.log(`[EMAIL PROCESSOR] Processing ${messages.length} messages [${folder}]`);
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
@@ -135,19 +137,24 @@ export default class EmailProcessor {
           body_text: this.extractBodyText(message),
           created_at_ts: message.receivedDateTime || message.sentDateTime || new Date().toISOString(),
           metadata: {
-            from: message.from?.emailAddress?.address,
+            direction: folder === 'sentitems' ? 'sent' : 'received',
+            connection_id: connectionId,
+            from_email: message.from?.emailAddress?.address,
             from_name: message.from?.emailAddress?.name,
+            to_email: message.toRecipients?.[0]?.emailAddress?.address,
+            from: message.from?.emailAddress?.address,
             to: message.toRecipients?.map((r: any) => r.emailAddress?.address),
             cc: message.ccRecipients?.map((r: any) => r.emailAddress?.address),
             bcc: message.bccRecipients?.map((r: any) => r.emailAddress?.address),
             hasAttachments: message.hasAttachments,
             importance: message.importance,
             conversationId: message.conversationId,
+            thread_key: message.conversationId,
             internetMessageId: message.internetMessageId,
             isRead: message.isRead,
             isDraft: message.isDraft
           },
-          raw: message // Store complete message for future reference
+          raw_source_data: message // Store complete message for future reference
         };
 
         const { error } = await supabase

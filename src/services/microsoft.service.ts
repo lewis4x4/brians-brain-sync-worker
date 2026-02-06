@@ -16,8 +16,8 @@ export class MicrosoftService {
    * Get stored delta link from Supabase sync_state table
    */
   private async getDeltaLink(
-    accountEmail: string, 
-    resourceType: 'messages' | 'calendar'
+    accountEmail: string,
+    resourceType: string
   ): Promise<string | null> {
     try {
       const { data, error } = await supabase
@@ -46,7 +46,7 @@ export class MicrosoftService {
    */
   private async saveDeltaLink(
     accountEmail: string,
-    resourceType: 'messages' | 'calendar',
+    resourceType: string,
     deltaLink: string
   ): Promise<void> {
     try {
@@ -79,9 +79,10 @@ export class MicrosoftService {
    * Subsequent runs: only new/changed messages
    */
   async fetchMessages(
-    accessToken: string, 
+    accessToken: string,
     accountEmail: string,
-    daysBack: number = 30  // Only used for initial sync
+    daysBack: number = 30,  // Only used for initial sync
+    folder: string = 'inbox'  // 'inbox' or 'sentitems'
   ) {
     const client = Client.init({
       authProvider: (done) => {
@@ -89,8 +90,10 @@ export class MicrosoftService {
       },
     });
 
+    const deltaKey = `messages_${folder}`;
+
     // Get stored delta link (if exists)
-    const storedDeltaLink = await this.getDeltaLink(accountEmail, 'messages');
+    const storedDeltaLink = await this.getDeltaLink(accountEmail, deltaKey);
     
     let allMessages: any[] = [];
     let nextLink: string | null = null;
@@ -102,16 +105,16 @@ export class MicrosoftService {
       
       if (storedDeltaLink) {
         // Use stored delta link for incremental sync
-        logger.info(`🔄 Using delta sync for ${accountEmail}`);
+        logger.info(`🔄 Using delta sync for ${accountEmail} [${folder}]`);
         url = storedDeltaLink;
       } else {
         // Initial sync - use delta endpoint with date filter
-        logger.info(`🆕 Initial delta sync for ${accountEmail} (last ${daysBack} days)`);
+        logger.info(`🆕 Initial delta sync for ${accountEmail} [${folder}] (last ${daysBack} days)`);
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - daysBack);
         const filterDate = startDate.toISOString();
-        
-        url = `/me/mailFolders/inbox/messages/delta?$filter=receivedDateTime ge ${filterDate}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,hasAttachments&$top=50`;
+
+        url = `/me/mailFolders/${folder}/messages/delta?$filter=receivedDateTime ge ${filterDate}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,body,hasAttachments,conversationId,internetMessageId,internetMessageHeaders,isDraft&$top=50`;
       }
 
       // Fetch messages (handle pagination)
@@ -152,7 +155,7 @@ export class MicrosoftService {
 
       // Save delta link for next sync
       if (deltaLink) {
-        await this.saveDeltaLink(accountEmail, 'messages', deltaLink);
+        await this.saveDeltaLink(accountEmail, deltaKey, deltaLink);
       }
 
       logger.info(`📧 Fetched ${allMessages.length} messages total for ${accountEmail}`);
@@ -174,9 +177,9 @@ export class MicrosoftService {
           .eq('user_id', USER_ID)
           .eq('service', 'microsoft_graph')
           .eq('account_email', accountEmail)
-          .eq('resource_type', 'messages');
+          .eq('resource_type', deltaKey);
       }
-      
+
       throw error;
     }
   }
