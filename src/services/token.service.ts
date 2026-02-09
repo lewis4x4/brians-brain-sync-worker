@@ -8,6 +8,12 @@ interface Tokens {
   expiresAt: string;
 }
 
+interface ConnectionCredentials {
+  clientId: string;
+  clientSecret: string;
+  tenantId: string;
+}
+
 export class TokenService {
   private encryptionKey: Buffer;
 
@@ -18,6 +24,36 @@ export class TokenService {
       .createHash('sha256')
       .update(serviceKey.slice(0, 32))
       .digest();
+  }
+
+  /**
+   * Get OAuth credentials from connection config
+   * Falls back to env vars if not in config (backward compatibility)
+   */
+  private async getConnectionCredentials(connectionId: string): Promise<ConnectionCredentials> {
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: connection, error } = await supabase
+      .from('integration_connections')
+      .select('config')
+      .eq('id', connectionId)
+      .single();
+
+    if (error || !connection) {
+      throw new Error('Connection not found');
+    }
+
+    // Use per-connection credentials if available, otherwise fall back to env vars
+    const config = connection.config || {};
+    
+    return {
+      clientId: config.client_id || process.env.MICROSOFT_CLIENT_ID || '',
+      clientSecret: config.client_secret || process.env.MICROSOFT_CLIENT_SECRET || '',
+      tenantId: config.tenant_id || 'common',
+    };
   }
 
   async getTokens(connectionId: string): Promise<Tokens> {
@@ -109,23 +145,25 @@ export class TokenService {
       throw new Error('No refresh token available');
     }
 
-    const clientId = process.env.MICROSOFT_CLIENT_ID;
-    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-      throw new Error('Microsoft OAuth credentials not configured');
+    // Get per-connection credentials
+    const credentials = await this.getConnectionCredentials(connectionId);
+    
+    if (!credentials.clientId || !credentials.clientSecret) {
+      throw new Error('Microsoft OAuth credentials not configured for this connection');
     }
 
+    logger.info(`Using tenant-specific credentials (tenant: ${credentials.tenantId})`);
+
     const response = await fetch(
-      'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      `https://login.microsoftonline.com/${credentials.tenantId}/oauth2/v2.0/token`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
+          client_id: credentials.clientId,
+          client_secret: credentials.clientSecret,
           refresh_token: tokens.refreshToken,
           grant_type: 'refresh_token',
         }),
