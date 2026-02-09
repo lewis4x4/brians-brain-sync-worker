@@ -18,7 +18,7 @@ export default class CalendarProcessor {
         .from('events')
         .select('id, subject, created_at_ts')
         .eq('event_type', 'meeting')
-        .filter('raw->>iCalUId', 'eq', iCalUId)
+        .filter('raw_source_data->>iCalUId', 'eq', iCalUId)
         .maybeSingle();
 
       if (error) {
@@ -155,7 +155,7 @@ export default class CalendarProcessor {
             sensitivity: event.sensitivity,
             webLink: event.webLink
           },
-          raw: event // CRITICAL: Store complete event with iCalUId
+          raw_source_data: event // CRITICAL: Store complete event with iCalUId
         };
 
         const { error } = await supabase

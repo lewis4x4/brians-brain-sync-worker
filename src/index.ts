@@ -18,11 +18,9 @@ import cors from 'cors';
 // ... other code ...
 
 app.use(cors({
-  origin: 'https://preview--brians-brain-nexus.lovable.app',
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || true,
   credentials: true
 }));
-app.use(express.json());
-
 app.use(express.json());
 
 // Health and sync routes

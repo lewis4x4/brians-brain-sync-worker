@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const USER_ID = '3ccb8364-da19-782e-b3fa-6ee4ed40820b';
+const USER_ID = process.env.OWNER_USER_ID || '3ccb8364-da19-482e-b3fa-6ee4ed40820b';
 
 export class MicrosoftService {
   
