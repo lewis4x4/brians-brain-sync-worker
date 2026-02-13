@@ -1,7 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { EnrichmentService } from '../services/enrichment.service';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const enrichmentService = new EnrichmentService();
 
 export default class EmailProcessor {
   /**
@@ -157,9 +159,11 @@ export default class EmailProcessor {
           raw_source_data: message // Store complete message for future reference
         };
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('events')
-          .insert(eventData);
+          .insert(eventData)
+          .select('id')
+          .single();
 
         if (error) {
           console.error('[EMAIL INSERT ERROR]', {
@@ -170,6 +174,11 @@ export default class EmailProcessor {
           skipped++;
         } else {
           created++;
+
+          // Auto-enrich the event with tags and categorization
+          if (inserted?.id) {
+            await enrichmentService.enrichEvent(inserted.id);
+          }
         }
 
       } catch (err) {
